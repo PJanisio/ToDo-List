@@ -33,6 +33,23 @@ if ($mybb->input['action'] == "") {
 		if(!todo_has_permission($row['id'], "can_see"))
 		    continue;
 		
+		$all = 0; $solved = 0; $percent = 0;
+		$aquery = $db->simple_select("todolist", "done", "pid={$row['id']}");
+		while($t = $db->fetch_array($aquery)) {
+			++$all;
+			if($t['done'] == 100)
+			    ++$solved;
+			$percent = $percent + $t['done'];
+		}
+		if($all != 0) {
+			$percent = (int) round($percent / $all , 2);
+			if($percent < 100)
+				$done = "<img src=\"images/spinner.gif\" border=\"0\" /> {$percent}% ({$solved}/{$all})";
+			else
+				$done = "<img src=\"images/todolist/done.png\" border=\"0\" /> {$percent}% ({$solved}/{$all})";
+		} else
+			$done = "-";
+		
 		$row['title'] = htmlspecialchars($row['title']);
 		$row['description'] = htmlspecialchars($row['description']);
 		eval("\$todo .= \"".$templates->get("todolist_projects_table")."\";");
@@ -119,11 +136,18 @@ if ($mybb->input['action'] == "") {
 		
 		$formattedname = format_name($row['name'], $group);
 		$owner = build_profile_link($formattedname, $row['nameid']);
-
-		if(todo_has_permission($id, "can_edit")) {
-			$mod_todo = "- ";
-			eval("\$mod_todo .= \"".$templates->get("todolist_mod")."\";");
-		}
+		
+		if(($mybb->user['usergroup'] != 4 AND $mybb->user['usergroup'] != 3 ) AND ($row['nameid'] != $mybb->user['uid'] )) {
+					$mod_todo = "";
+				}	
+				else
+					{
+					$mod_todo = "- ";
+			eval("\$mod_todo .= \"".$templates->get("todolist_mod")."\";");	
+					}
+		
+	
+		
 		
 		eval("\$todo .= \"".$templates->get("todolist_table")."\";");		
 	}
@@ -227,6 +251,7 @@ if ($mybb->input['action'] == "") {
 		eval("\$lastedit = \"".$templates->get("todolist_edited")."\";");
 	}
 	
+	$row['version'] = htmlspecialchars($row['version']);
 	$back = "<a href='todolist.php?action=show_project&id={$row['pid']}'>{$lang->back_showtodo}</a>";
 	
 	eval("\$todolist_show = \"".$templates->get("todolist_show")."\";");
@@ -254,7 +279,8 @@ if ($mybb->input['action'] == "") {
 				"nameid" => (int)$mybb->user['uid'],
 				"date" => TIME_NOW,
 				"assign" => (int)$mybb->input['assign'],
-				"priority" => $db->escape_string($mybb->input['priority'])
+				"priority" => $db->escape_string($mybb->input['priority']),
+				"version" => $db->escape_string($mybb->input['version'])
 			);
 			$id = $db->insert_query("todolist", $insert);
 			
@@ -282,13 +308,16 @@ if ($mybb->input['action'] == "") {
 			$priority_check['low'] = "selected=\"selected\"";
 		$title = $mybb->input['title'];
 		$message = $mybb->input['message'];
+		$version = $mybb->input['version'];
 	} else {
 		$priority_check['normal'] = "selected=\"selected\"";
 		$title = ""; $message = "";
+		$version = "";
 	}
 	add_breadcrumb($lang->title_overview.": ".$mybb->settings['todo_name'], "todolist.php");
 	add_breadcrumb($lang->add_todo, "todolist.php?action=add");
-	$query = $db->simple_select("users", "uid, username", "", array("order_by" => "username"));
+	//$query = $db->simple_select("users", "uid, username", "", array("order_by" => "username"));
+	$query = $db->query("SELECT uid, username, usergroup FROM mybb_users WHERE usergroup = 4 OR usergroup = 3 OR usergroup = 10 OR usergroup = 9  OR usergroup = 6");
 	$userselect = "<option value=\"0\">-</option>";
 	while($user = $db->fetch_array($query)) {
 		if(isset($mybb->input['assign']) && $mybb->input['assign'] == $user['uid'])
@@ -302,10 +331,18 @@ if ($mybb->input['action'] == "") {
 } elseif ($mybb->input['action'] == 'delete') {
 	if(!isset($mybb->input['id']))
 	    header("Location: {$mybb->settings['bburl']}/todolist.php");
-	$id=(int)$mybb->input['id'];
-	$query = $db->simple_select("todolist", "pid", "id={$id}");
-	if(!todo_has_permission($db->fetch_field($query, "pid"), "can_edit"))
+	$id = (int)$mybb->input['id'];
+	$query = $db->simple_select('todolist', '*', "id='{$id}'");
+	$row = $db->fetch_array($query);
+	if(!todo_has_permission($row['pid'], "can_edit"))
 	    todo_no_permission();
+		
+		if ($mybb->user['usergroup'] != 4 AND $mybb->user['usergroup'] != 3 ) {
+	
+	if($row['nameid'] != $mybb->user['uid'] ) 
+		todo_no_permission();
+		
+		}
 
 	add_breadcrumb($lang->title_overview.": ".$mybb->settings['todo_name'], "todolist.php");
 	add_breadcrumb($lang->delete_todo, "todolist.php?action=delete&id={$id}");
@@ -315,6 +352,8 @@ if ($mybb->input['action'] == "") {
 	else {
 		if($mybb->request_method == "post") {
 			$db->delete_query("todolist", "id='{$id}'");
+
+				
 			redirect("todolist.php", $lang->deleted_todo);
 		} else {
 			eval("\$todolist_confirm = \"".$templates->get("todolist_confirm")."\";");
@@ -329,6 +368,17 @@ if ($mybb->input['action'] == "") {
 	$row = $db->fetch_array($query);
 	if(!todo_has_permission($row['pid'], "can_edit"))
 	    todo_no_permission();
+		
+	//only owner can change task
+	
+	if ($mybb->user['usergroup'] != 4 AND $mybb->user['usergroup'] != 3 ) {
+	
+		if($row['nameid'] != $mybb->user['uid'] )
+		todo_no_permission();
+		
+		}
+
+
 	
 	if($mybb->request_method == "post") {
 		verify_post_check($mybb->input['my_post_key'], false);
@@ -357,9 +407,14 @@ if ($mybb->input['action'] == "") {
 				"lastedit" => TIME_NOW,
 				"priority" => $db->escape_string($mybb->input['priority']),
 				"status" => $db->escape_string($mybb->input['status']),
-				"done" => $db->escape_string($mybb->input['done'])
+				"done" => $db->escape_string($mybb->input['done']),
+				"version" => $db->escape_string($mybb->input['version'])
 			);
 			$db->update_query("todolist", $update_array, "id='{$id}'");
+			
+			
+				
+				
 
 			if($mybb->input['assign'] != $row['assign'] && $mybb->input['assign'] != 0 && $mybb->settings['todo_pm_notify']) {
 				$assign = get_user($mybb->input['assign']);
@@ -368,8 +423,18 @@ if ($mybb->input['action'] == "") {
 				$message = $lang->sprintf($lang->notify_message, $assign['username'], $profil, $mybb->user['username'], $todo, $mybb->input['title']);
 			    todo_pm($mybb->input['assign'], $lang->notify_subject, $message);
 			}
+			
+			if($mybb->input['lastedit'] != $row['lastedit'] && $mybb->settings['todo_pm_notify']) {
+				$assign = get_user($row['assign']);
+				$profil = $mybb->settings['bburl']."/".get_profile_link($mybb->user['uid']);
+				$todo = $mybb->settings['bburl']."/todolist.php?action=show&id=".$id;
+				$message = $lang->sprintf($lang->update_message, $assign['username'], $profil, $mybb->user['username'], $todo, $mybb->input['title']);
+			    //todo_pm($mybb->input['assign'], $lang->update_subject, $message);
+				todo_pm($row['nameid'], $lang->update_subject, $message);
+				}
 
 			redirect("todolist.php?action=show&id={$id}", $lang->edited_todo);
+				
 		}
 	}
 
@@ -414,6 +479,7 @@ if ($mybb->input['action'] == "") {
 		$title = htmlspecialchars($mybb->input['title']);
 		$message = $mybb->input['message'];
 		$assign = $mybb->input['assign'];
+		$version = $mybb->input['version'];
 	} else {
 		$errors = "";
 		
@@ -449,6 +515,7 @@ if ($mybb->input['action'] == "") {
 		$message = $row['message'];
 		$title = htmlspecialchars($row['title']);
 		$assign = $row['assign'];
+		$version = $row['version'];
 	}
 
 	add_breadcrumb($lang->show_showtodo.": ".$title, "todolist.php?action=show&id={$id}");
@@ -529,6 +596,11 @@ if ($mybb->input['action'] == "") {
 	else
 		$priority = array("low", "normal", "high");
 
+	if($mybb->input['version'])
+	    $version = $mybb->input['version'];
+	else
+		$version = "";
+
 	if($mybb->input['search'] == "do") {
 		//Let's search :O
 		$where = array();
@@ -568,7 +640,12 @@ if ($mybb->input['action'] == "") {
 		$where[] = "priority IN ('".str_replace(",", "','", $db->escape_string(implode(",", $priority)))."')";
 		foreach($priority as $pr)
 		    $url .= "&priority[]=".urlencode($pr);
-		
+
+		if($version != "") {
+		    $where[] = "version = '".$db->escape_string($version)."'";
+			$url .= "&version=".urlencode($version);
+		}
+
 		$where = implode(" AND ", $where);
 		
 		$page = (int)$mybb->input['page'];
@@ -709,5 +786,97 @@ if ($mybb->input['action'] == "") {
 	$string = htmlspecialchars($string); $creator = htmlspecialchars($creator); $assign = htmlspecialchars($assign);
 	eval("\$search = \"".$templates->get("todolist_search")."\";");
 	output_page($search);
+} elseif($mybb->input['action'] == "new") {
+	add_breadcrumb($lang->title_overview.": ".$mybb->settings['todo_name'], "todolist.php");
+	add_breadcrumb($lang->new, "todolist.php?action=new");
+
+	$fetch = 20;
+	$fetched = array();
+	//Fetch new added
+	$query = $db->simple_select("todolist", "*", "", array("order_by" => "date", "order_dir" => "desc", "limit" => $fetch));
+	$count = 0; $lastdate = 0;
+	while($row = $db->fetch_array($query)) {
+		++$count;
+		$fetched[$row['id']] = $row;
+		$fetched[$row['id']]['type'] = "new";
+		if($count == $fetch)
+		    $lastdate = $row['date'];
+	}
+	//Fetch last edited
+	$query = $db->simple_select("todolist", "*", "lastedit > '{$lastdate}'", array("order_by" => "lastedit", "order_dir" => "desc", "limit" => $fetch));
+	while($row = $db->fetch_array($query)) {
+		$fetched[$row['id']] = $row;
+		$fetched[$row['id']]['type'] = "edited";
+	}
+	
+	uasort($fetched, "todo_sort_new");
+	array_splice($fetched, $fetch);
+	
+	foreach($fetched as $row) {
+		if(!todo_has_permission($row['pid']))
+		    continue;
+		$title = "<img src=\"images/todolist/{$row['type']}.png\" alt=\"\" /> <a href=\"todolist.php?action=show&id={$row['id']}\">".htmlspecialchars($row['title'])."</a>";
+		if($row['nameid'] != "")
+			$group = $db->fetch_field($db->simple_select("users", "usergroup", "uid={$row['nameid']}"), "usergroup");
+		else
+			$group = "";
+		$formattedname = format_name($row['name'], $group);
+		$from = build_profile_link($formattedname, $row['nameid']);
+
+		$pquery = $db->simple_select("todolist_projects", "*", "id={$row['pid']}");
+		$project = $db->fetch_array($pquery);
+		$project = "<a href=\"todolist.php?action=show_project&id={$project['id']}\">".htmlspecialchars($project['title'])."</a>";
+
+		if($row['status'] == 'wait') {
+			$status = "<img src=\"images/todolist/waiting.png\" border=\"0\" /> {$lang->status_wait}";
+		} elseif($row['status'] == 'development') {
+			$status = "<img src=\"images/todolist/development.png\" border=\"0\" /> {$lang->status_dev}";
+		} elseif($row['status'] == 'feedback') {
+			$status = "<img src=\"images/todolist/feedback.png\" border=\"0\" /> {$lang->status_feed}";
+		} elseif($row['status'] == 'resolved') {
+			$status = "<img src=\"images/icons/exclamation.gif\" border=\"0\" /> {$lang->status_resolved}";
+		} elseif($row['status'] == 'closed') {
+			$status = "<img src=\"images/todolist/lock.png\" border=\"0\" /> {$lang->status_closed}";
+		}
+
+		if($row['done'] == '0') {
+			$done = "<img src=\"images/spinner.gif\" border=\"0\" /> {$lang->done_0}";
+		} elseif($row['done'] == '25') {
+			$done = "<img src=\"images/spinner.gif\" border=\"0\" /> {$lang->done_25}";
+		} elseif($row['done'] == '50') {
+			$done = "<img src=\"images/spinner.gif\" border=\"0\" /> {$lang->done_50}";
+		} elseif($row['done'] == '75') {
+			$done = "<img src=\"images/spinner.gif\" border=\"0\" /> {$lang->done_75}";
+		} elseif($row['done'] == '100') {
+			$done = "<img src=\"images/todolist/done.png\" border=\"0\" /> {$lang->done_100}";
+		}
+
+		if($row['type'] == "edited")
+			$date = my_date($mybb->settings['dateformat'], $row['lastedit'])." - ".my_date($mybb->settings['timeformat'], $row['lastedit']);
+		else
+			$date = my_date($mybb->settings['dateformat'], $row['date'])." - ".my_date($mybb->settings['timeformat'], $row['date']);
+		eval("\$news .= \"".$templates->get("todolist_new_table")."\";");
+	}
+
+	eval("\$new = \"".$templates->get("todolist_new")."\";");
+	output_page($new);
+}
+
+function todo_sort_new($a, $b)
+{
+	if($a['lastedit'] > $a['date'])
+	    $adate = $a['lastedit'];
+	else
+		$adate = $a['date'];
+
+	if($b['lastedit'] > $b['date'])
+	    $bdate = $b['lastedit'];
+	else
+		$bdate = $b['date'];
+	
+	if($adate == $bdate)
+	    return 1;
+	return ($adate < $bdate) ? 2 : 0;
+
 }
 ?>

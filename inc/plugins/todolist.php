@@ -23,12 +23,12 @@ if(is_array($pluginlist['active']) && in_array("mybbservice", $pluginlist['activ
 function todolist_info()
 {
 	return array(
-		"name"			=> "ToDo-Liste",
+		"name"			=> "ToDo-Liste (+)",
 		"description"	=> "Dieses Plugin erstellt eine ToDo Liste, mithilfe Aufgaben in deinem Forum verwaltet werden können<br /><i>Based on ToDo List by FalkenaugeMihawk</i>",
 		"website"		=> "http://mybbservice.de",
-		"author"		=> "MyBBService",
+		"author"		=> "MyBBService / Pavlus",
 		"authorsite"	=> "http://mybbservice.de",
-		"version"		=> "1.0.2",
+		"version"		=> "1.0.3",
 		"guid"			=> "",
 		"compatibility" => "17*,18*",
 		"dlcid"			=> "18"
@@ -59,6 +59,7 @@ function todolist_install()
 				`priority`		varchar(6)		NOT NULL DEFAULT 'normal',
 				`status`		varchar(11)		NOT NULL DEFAULT 'wait',
 				`done`			int(3)			NOT NULL DEFAULT '0',
+				`version`		varchar(11)		NOT NULL DEFAULT '',
 	PRIMARY KEY (`id`) ) ENGINE=MyISAM {$col}");
 
 	$db->query("CREATE TABLE `".TABLE_PREFIX."todolist_projects` (
@@ -103,7 +104,7 @@ function todolist_install()
 <table border=\"0\" cellspacing=\"{\$theme[\'borderwidth\']}\" cellpadding=\"{\$theme[\'tablespace\']}\" class=\"tborder\" style=\"clear: both;\">
 	<tr>
 		<td class=\"thead\" colspan=\"6\"><strong>{\$lang->title_overview}: {\$mybb->settings[\'todo_name\']}</strong></td>
-		<td class=\"thead\" colspan=\"2\" style=\"text-align: right;\"><a href=\"todolist.php?action=search\">{\$lang->search}</a></td>
+		<td class=\"thead\" colspan=\"2\" style=\"text-align: right;\"><a href=\"todolist.php?action=new\">{\$lang->new}</a> | <a href=\"todolist.php?action=search\">{\$lang->search}</a></td>
 	</tr>
 	<tr>
 		<td class=tcat>{\$lang->title_todo}</td>
@@ -141,12 +142,13 @@ function todolist_install()
 {\$multipage}
 <table border=\"0\" cellspacing=\"{\$theme[\'borderwidth\']}\" cellpadding=\"{\$theme[\'tablespace\']}\" class=\"tborder\" style=\"clear: both;\">
 	<tr>
-		<td class=\"thead\"><strong>{\$lang->title_overview}: {\$mybb->settings[\'todo_name\']}</strong></td>
-		<td class=\"thead\" style=\"text-align: right;\"><a href=\"todolist.php?action=search\">{\$lang->search}</a></td>
+		<td class=\"thead\" colspan=\"2\"><strong>{\$lang->title_overview}: {\$mybb->settings[\'todo_name\']}</strong></td>
+		<td class=\"thead\" style=\"text-align: right;\"><a href=\"todolist.php?action=new\">{\$lang->new}</a> | <a href=\"todolist.php?action=search\">{\$lang->search}</a></td>
 	</tr>
 	<tr>
 		<td class=tcat>{\$lang->title_todo}</td>
 		<td class=tcat>{\$lang->description_todo}</td>
+		<td class=tcat>{\$lang->done_todo}</td>
 	</tr>
 	{\$todo}
 </table>
@@ -201,6 +203,10 @@ function todolist_install()
 		<td>{\$status}</td>
 	</tr>
 	<tr class=\"trow2\">
+		<td style=\"width:200px;\">{\$lang->version_todo}:</td>
+		<td>{\$row[\'version\']}</td>
+	</tr>
+	<tr class=\"trow1\">
 		<td style=\"width:200px;\">{\$lang->description_todo}:</td>
 		<td>{\$message}</td>
 	</tr>
@@ -253,8 +259,12 @@ function todolist_install()
 		<td><select name=\"assign\" style=\"width:100px;\">{\$userselect}</select></td>
 	</tr>
 	<tr class=\"trow1\">
+		<td style=\"width:100px;\">{\$lang->version_todo}:</td>
+		<td><input type=\"text\" class=\"textbox\" name=\"version\" value=\"{\$version}\" /></td>
+	</tr>
+	<tr class=\"trow1\">
 		<td style=\"width:200px;\">{\$lang->description_todo}:</td>
-		<td><textarea name=\"message\" rows=\"20\" cols=\"70\" id=\"message\">{\$message}</textarea>{\$codebuttons}</td>
+		<td><textarea name=\"message\" rows=\"20\" cols=\"70\" id=\"message\">----------------{\$mybb->user['username']} @ [ {\$lang->current_time}]----------------{\$message}</textarea>{\$codebuttons}</td>
 	</tr>
 	<tr class=\"trow1\">
 		<td colspan=\"2\"><input type=\"submit\" value=\"{\$lang->add_todo}\" style=\"margin-left: 280px; \"/></td>
@@ -328,8 +338,12 @@ function todolist_install()
 			<td><select name=\"assign\" style=\"width:100px;\">{\$userselect}</select></td>
 		</tr>
 		<tr class=\"trow1\">
+			<td style=\"width:100px;\">{\$lang->version_todo}:</td>
+			<td><input type=\"text\" class=\"textbox\" name=\"version\" value=\"{\$version}\" /></td>
+		</tr>
+		<tr class=\"trow1\">
 			<td style=\"width:200px;\">{\$lang->description_todo}:</td>
-			<td><textarea name=\"message\" rows=\"20\" cols=\"70\" id=\"message\">{\$message}</textarea>{\$codebuttons}</td>
+			<td><textarea name=\"message\" rows=\"20\" cols=\"70\" id=\"message\">{\$message}----------------{\$mybb->user['username']} @ [ {\$lang->current_time}]----------------</textarea>{\$codebuttons}</td>
 		</tr>
 		<tr class=\"trow1\">
 			<td colspan=\"2\"><input type=\"submit\" value=\"{\$lang->send_edittodo}\" style=\"margin-left: 280px; \"/></td>
@@ -380,6 +394,7 @@ function todolist_install()
 		"template" => "<tr class=\"trow1\" colspan=\"8\">
 	<td><a href=\"todolist.php?action=show_project&id={\$row[\'id\']}\">{\$row[\'title\']}</a></td>
 	<td>{\$row[\'description\']}</td>
+	<td>{\$done}</td>
 </tr>",
 		"sid" => -2
 	);
@@ -388,7 +403,7 @@ function todolist_install()
 	$templatearray = array(
 		"title" => "todolist_projects_table_no_results",
 		"template" => "<tr class=\"trow1\">
-	<td colspan=\"2\"><center>{\$lang->no_projects}</center></td>
+	<td colspan=\"3\"><center>{\$lang->no_projects}</center></td>
 </tr>",
 		"sid" => -2
 	);
@@ -469,6 +484,12 @@ function todolist_install()
 					<option value=\"low\" style=\"background-image:url(images/todolist/low_prio.gif); background-repeat:no-repeat; text-align:center;\" {\$priority_check[\'low\']}>{\$lang->low_priority}</option>
 			</select></td>
 	</tr>
+	<tr class=\"trow2\">
+		<td style=\"width: 10%;\">{\$lang->version_todo}:</td>
+		<td><input type=\"text\" class=\"textbox\" name=\"version\" value=\"{\$version}\" /></td>
+		<td></td>
+		<td></td>
+	</tr>
 	<tr class=\"trow1\">
 		<td colspan=\"8\" style=\"text-align: center;\"><input type=\"submit\" value=\"{\$lang->search_do}\" /></td>
 	</tr>
@@ -537,7 +558,7 @@ function todolist_install()
 		"template" => "{\$multipage}
 <table border=\"0\" cellspacing=\"{\$theme[\'borderwidth\']}\" cellpadding=\"{\$theme[\'tablespace\']}\" class=\"tborder\" style=\"clear: both;\">
 	<tr>
-		<td class=\"thead\" colspan=\"8\"><strong>{\$lang->search_results}</strong></td>
+		<td class=\"thead\" colspan=\"9\"><strong>{\$lang->search_results}</strong></td>
 	</tr>
 	<tr class=\"tcat\">
 		<td>{\$lang->title_todo}</td>
@@ -548,6 +569,7 @@ function todolist_install()
 		<td>{\$lang->status_todo}</td>
 		<td>{\$lang->done_todo}</td>
 		<td>{\$lang->assign_todo}</td>
+		<td>{\$lang->version_todo}</td>
 	</tr>
 	{\$resulttable}
 </table><br />",
@@ -566,6 +588,7 @@ function todolist_install()
 	<td>{\$sstatus}</td>
 	<td>{\$done}</td>
 	<td>{\$sassign}</td>
+	<td>{\$row[\'version\']}</td>
 </tr>",
 		"sid" => -2
 	);
@@ -573,7 +596,7 @@ function todolist_install()
 
 	$templatearray = array(
 		"title" => "todolist_search_resulttable_nothing",
-		"template" => "<tr class=\"trow1\"><td colspan=\"8\" style=\"text-align: center;\">{\$lang->search_results_nothing}</td></tr>",
+		"template" => "<tr class=\"trow1\"><td colspan=\"9\" style=\"text-align: center;\">{\$lang->search_results_nothing}</td></tr>",
 		"sid" => -2
 	);
 	$db->insert_query("templates", $templatearray);
@@ -620,6 +643,50 @@ function todolist_install()
 		"sid" => -2
 	);
 	$db->insert_query("templates", $templatearray);
+
+	$templatearray = array(
+        "title" => "todolist_new",
+        "template" => "<html>
+<head>
+<title>{\$mybb->settings[\'bbname\']} - {\$lang->title_overview}: {\$mybb->settings[\'todo_name\']}</title>
+{\$headerinclude}
+</head>
+<body>
+{\$header}
+<table border=\"0\" cellspacing=\"{\$theme[\'borderwidth\']}\" cellpadding=\"{\$theme[\'tablespace\']}\" class=\"tborder\" style=\"clear: both;\">
+	<tr>
+		<td class=\"thead\" colspan=\"8\"><strong>{\$lang->new}</strong></td>
+	</tr>
+	<tr class=\"tcat\">
+		<td>{\$lang->title_todo}</td>
+		<td>{\$lang->search_project}</td>
+		<td>{\$lang->from_todo}</td>
+		<td>{\$lang->date_todo}</td>
+		<td>{\$lang->done_todo}</td>
+		<td>{\$lang->status_todo}</td>
+	</tr>
+	{\$news}
+</table>
+{\$footer}
+</body>
+</html>",
+        "sid" => -2
+	);
+	$db->insert_query("templates", $templatearray);
+
+	$templatearray = array(
+        "title" => "todolist_new_table",
+        "template" => "	<tr class=\"trow1\">
+		<td>{\$title}</td>
+		<td>{\$project}</td>
+		<td>{\$from}</td>
+		<td>{\$date}</td>
+		<td>{\$done}</td>
+		<td>{\$status}</td>
+	</tr>",
+        "sid" => -2
+    );
+    $db->insert_query("templates", $templatearray);
 
 	//Einstellung Gruppe
 	$todolist_group = array(
@@ -940,6 +1007,9 @@ function todo_has_permission($project, $right="can_see", $user=false)
 	if($user['additionalgroups'] != "")
 		$groups = explode(",", $user['additionalgroups']);
 	$groups[] = $user['usergroup'];
+	
+	
+		
 
 	$rights = false;
 	foreach($groups as $gid) {
@@ -947,6 +1017,9 @@ function todo_has_permission($project, $right="can_see", $user=false)
 		if($db->num_rows($query) > 0)
 			$rights = true;
 	}
+	
+	
+	
 	return $rights;
 }
 ?>
