@@ -1,3 +1,26 @@
+ToDo List 1.0.3 - updated 
+=================================
+All glory to plugin creator - MyBBService.de.
+This repository has been issued after few fixes and updates which was done to fit mine requirements.
+
+- task creator will get PM after any change in the task (progress,
+priority etc)
+- administrators can edit and delete all task no matter if they has been
+marked in settings (hardcoded now)
+- if you are not administrator you can only edit or delete your own
+created tasks ( fix that every user can edit or delete)
+- predefinied text in textrarea during editing or new task: Nickname and
+current datestamp.
+
+In addition:
+Please edit your language file @ : /forum/inc/languages/lang_name/global.lang.php
+and add:
+
+```php
+//current time
+$l['current_time'] = date("Y-m-d H:i:s");
+```
+
 ToDo List 1.0 von MyBBService.de
 =================================
 
