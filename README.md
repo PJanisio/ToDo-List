@@ -1,7 +1,7 @@
 ToDo List 1.0.3 - updated 
 =================================
 All glory to plugin creator - MyBBService.de.
-This repository has been issued after few fixes and updates which was done to fit mine requirements.
+This repository has been created after few fixes and updates which was done to fit my requirements.
 
 - task creator will get PM after any change in the task (progress,
 priority etc)
